@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flight-aggregator-config
+  namespace: flight-aggregator
+data:
+  PORT: "8080"
+  CACHE_TTL: "300"
+  LOG_LEVEL: "info"
+  AVIATIONSTACK_BASE_URL: "http://api.aviationstack.com/v1"
+  OPENWEATHER_BASE_URL: "https://api.openweathermap.org/data/2.5"
+  DEFAULT_WEATHER_CITY: "Frankfurt"

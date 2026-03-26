@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: flight-aggregator
+  namespace: flight-aggregator
+spec:
+  selector:
+    app: flight-aggregator
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: ClusterIP

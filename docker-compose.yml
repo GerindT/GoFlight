@@ -1,0 +1,21 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  app:
+    build: .
+    depends_on:
+      - redis
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      REDIS_URL: "redis://redis:6379/0"
+      CACHE_TTL: "300"
+      AVIATIONSTACK_BASE_URL: "http://api.aviationstack.com/v1"
+      OPENWEATHER_BASE_URL: "https://api.openweathermap.org/data/2.5"
+      DEFAULT_WEATHER_CITY: "Frankfurt"
+      AVIATIONSTACK_API_KEY: "${AVIATIONSTACK_API_KEY}"
+      OPENWEATHER_API_KEY: "${OPENWEATHER_API_KEY}"

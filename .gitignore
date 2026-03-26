@@ -1,0 +1,13 @@
+.env
+.logs/
+.backend.pid
+.frontend.pid
+
+.gocache/
+.gomodcache/
+.gopath/
+.bin/
+
+frontend/node_modules/
+frontend/dist/
+start.md

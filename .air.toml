@@ -1,0 +1,13 @@
+root = "."
+tmp_dir = ".air-tmp"
+
+[build]
+cmd = "go build -o ./.air-tmp/goflight ./cmd/api"
+bin = "./.air-tmp/goflight"
+include_ext = ["go", "tpl", "tmpl", "html", "yaml", "yml", "env"]
+exclude_dir = ["frontend", ".git", ".air-tmp", ".gocache", ".gomodcache", ".gopath", ".logs"]
+delay = 500
+stop_on_error = true
+
+[log]
+time = true
