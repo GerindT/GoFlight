@@ -1,73 +1,89 @@
 # GoFlight
 
-GoFlight is a concurrent API gateway that aggregates flight details and weather data with caching, circuit breakers, and Prometheus metrics.
+GoFlight is a Go-based flight data aggregator with a terminal-style Vue frontend.  
+It combines flight status + weather data, adds resilience patterns (timeouts, circuit breakers, cache fallback), and exposes production-friendly health and metrics endpoints.
 
 ## Features
 
-- Gin API endpoint: `GET /api/v1/dashboard/:flight`
-- Cache-first reads with Redis and stale-cache fallback
-- Fan-out/fan-in upstream calls guarded by context
-- Circuit breakers using `sony/gobreaker`
-- Structured request logging with `log/slog`
-- Prometheus metrics at `GET /metrics`
+### Backend
+
+- `GET /api/v1/dashboard/:flight` aggregation endpoint
+- Cache-first reads with Redis + stale-cache fallback
+- Fan-out/fan-in concurrency for upstream calls
+- Circuit breakers via `sony/gobreaker`
+- Structured logs (`slog`) with request IDs
+- Metrics endpoint: `GET /metrics`
 - Health endpoints: `GET /healthz`, `GET /readyz`
+
+### Frontend (Terminal UI)
+
+- Shell-like typing experience (no classic form input)
+- Command history (`ArrowUp` / `ArrowDown`)
+- Command aliases (`h`, `cls`, `f`, `nf`, etc.)
+- Tab completion suggestions (shown in a bottom status line)
+- Multi-command chaining with `&&`
+- Built-in commands: `help`, `flight`, `status`, `uptime`, `neofetch`, `boot`, `height`, `clear`
+
+## Tech Stack
+
+- **Backend:** Go, Gin, Prometheus client, Redis, Gobreaker
+- **Frontend:** Vue 3 + Vite
+- **Dev tooling:** Air (backend hot reload), Docker Compose
 
 ## Project Layout
 
-- `cmd/api/main.go` - app wiring and graceful shutdown
-- `internal/services/aggregator.go` - aggregation logic and resilience patterns
-- `internal/external/*.go` - upstream and cache clients
-- `internal/handlers/flight_handler.go` - HTTP controller
-- `internal/middleware/*.go` - logging and metrics middleware
+- `cmd/api/main.go` - API startup, middleware, graceful shutdown
+- `internal/services/aggregator.go` - core aggregation and resilience
+- `internal/external/*.go` - upstream API + Redis clients
+- `internal/handlers/flight_handler.go` - HTTP handler layer
+- `internal/middleware/*.go` - logger + metrics middleware
+- `frontend/` - terminal-style Vue app
+- `scripts/dev-local.sh` - start local full stack
+- `scripts/stop-local.sh` - stop local processes
 - `k8s/*.yaml` - Kubernetes manifests
 
-## Run Locally
+## Quickstart (Local)
 
-1. Copy env file and set API keys:
+1. Copy env template:
    - `cp .env.example .env`
-2. Start backend + frontend in one command:
+2. Add your API keys in `.env`:
+   - `AVIATIONSTACK_API_KEY`
+   - `OPENWEATHER_API_KEY`
+3. Start full local stack:
    - `bash scripts/dev-local.sh`
-3. Open app:
-   - `http://localhost:5173`
-4. Example API requests:
-   - `curl http://localhost:8080/healthz`
-   - `curl http://localhost:8080/readyz`
-   - `curl http://localhost:8080/api/v1/dashboard/LH123`
-   - `curl http://localhost:8080/metrics`
-5. Stop local services:
+4. Open:
+   - Frontend: `http://localhost:5173`
+   - API health: `http://localhost:8080/healthz`
+5. Stop:
    - `bash scripts/stop-local.sh`
 
-### Hot Reload
+## Terminal Commands (Frontend)
 
-- Frontend hot reload: enabled by Vite (`npm --prefix frontend run dev`).
-- Backend hot reload: enabled via `air` through `scripts/dev-local.sh`.
-- `dev-local.sh` auto-installs `air` to `./.bin` if missing.
+- `help` - list commands
+- `flight LH123` - fetch flight dashboard
+- `status` - print local UI/API status
+- `uptime` - show session uptime
+- `neofetch` - print splash
+- `boot` - run boot animation
+- `height 620` - set terminal height
+- `clear` - clear terminal output
+- Command chaining:
+  - `neofetch && status && flight LH123`
 
-## Tests
+## Hot Reload
 
-- `go test ./...`
-- Frontend build check:
+- Frontend: Vite dev server
+- Backend: Air (auto-installed to `./.bin` by `scripts/dev-local.sh` if missing)
+
+## Verify
+
+- Backend tests:
+  - `go test ./...`
+- Frontend build:
   - `npm --prefix frontend run build`
 
-## Docker
+## Deployment Notes
 
-- Build: `docker build -t goflight:local .`
-- Run:
-  - `docker run --rm -p 8080:8080 --env-file .env goflight:local`
-
-## Kubernetes (Minikube)
-
-```bash
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/secret.yaml
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
-kubectl apply -f k8s/ingress.yaml
-kubectl apply -f k8s/hpa.yaml
-```
-
-## Notes
-
-- `k8s/secret.yaml` uses base64 placeholders for demo only.
-- For production secret management, prefer Sealed Secrets or External Secrets Operator.
+- Docker image and compose are included for local/runtime use.
+- Kubernetes manifests are in `k8s/` (namespace, configmap, secret, deployment, service, ingress, hpa).
+- `k8s/secret.yaml` uses demo placeholders; use proper secret management in production (Sealed Secrets, ESO, Vault, etc.).
