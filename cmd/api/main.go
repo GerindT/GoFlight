@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -77,11 +78,12 @@ func main() {
 
 	aggregator := services.NewAggregator(flightClient, weatherClient, cache, ttl)
 	handler := handlers.NewFlightHandler(aggregator)
+	allowedOrigins := splitAndTrim(env("FRONTEND_ORIGINS", "http://localhost:5173"))
 
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"http://localhost:5173"},
+		AllowOrigins: allowedOrigins,
 		AllowMethods: []string{"GET", "OPTIONS"},
 		AllowHeaders: []string{"Origin", "Content-Type", "Accept"},
 	}))
@@ -135,4 +137,19 @@ func env(key, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+func splitAndTrim(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"http://localhost:5173"}
+	}
+	return out
 }
