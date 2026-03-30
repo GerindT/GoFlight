@@ -79,11 +79,12 @@ func main() {
 	aggregator := services.NewAggregator(flightClient, weatherClient, cache, ttl)
 	handler := handlers.NewFlightHandler(aggregator)
 	allowedOrigins := splitAndTrim(env("FRONTEND_ORIGINS", "http://localhost:5173"))
+	corsMatcher := newCORSMatcher(allowedOrigins)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: allowedOrigins,
+		AllowOriginFunc: corsMatcher,
 		AllowMethods: []string{"GET", "OPTIONS"},
 		AllowHeaders: []string{"Origin", "Content-Type", "Accept"},
 	}))
@@ -143,7 +144,7 @@ func splitAndTrim(raw string) []string {
 	parts := strings.Split(raw, ",")
 	out := make([]string, 0, len(parts))
 	for _, part := range parts {
-		value := strings.TrimSpace(part)
+		value := normalizeOrigin(strings.TrimSpace(part))
 		if value != "" {
 			out = append(out, value)
 		}
@@ -152,4 +153,36 @@ func splitAndTrim(raw string) []string {
 		return []string{"http://localhost:5173"}
 	}
 	return out
+}
+
+func normalizeOrigin(origin string) string {
+	origin = strings.TrimSpace(origin)
+	origin = strings.TrimSuffix(origin, "/")
+	return origin
+}
+
+func newCORSMatcher(allowed []string) func(string) bool {
+	exact := map[string]struct{}{}
+	wildcards := make([]string, 0)
+	for _, origin := range allowed {
+		normalized := normalizeOrigin(origin)
+		if strings.HasPrefix(normalized, "*.") {
+			wildcards = append(wildcards, strings.TrimPrefix(normalized, "*"))
+			continue
+		}
+		exact[normalized] = struct{}{}
+	}
+
+	return func(origin string) bool {
+		origin = normalizeOrigin(origin)
+		if _, ok := exact[origin]; ok {
+			return true
+		}
+		for _, wildcard := range wildcards {
+			if strings.HasSuffix(origin, wildcard) {
+				return true
+			}
+		}
+		return false
+	}
 }
