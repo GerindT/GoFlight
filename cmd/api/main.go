@@ -31,9 +31,25 @@ func main() {
 		}
 	}
 
-	redisCache, err := external.NewRedisCache(env("REDIS_URL", "redis://localhost:6379/0"))
-	if err != nil {
-		log.Fatalf("redis setup failed: %v", err)
+	cache := external.CacheManager(external.NewMemoryCache())
+	usingRedis := false
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		redisCache, err := external.NewRedisCache(redisURL)
+		if err != nil {
+			logger.Warn("redis config invalid, using in-memory cache", "error", err)
+		} else {
+			ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+			pingErr := redisCache.Ping(ctx)
+			cancel()
+			if pingErr != nil {
+				logger.Warn("redis unreachable, using in-memory cache", "error", pingErr)
+			} else {
+				cache = redisCache
+				usingRedis = true
+			}
+		}
+	} else {
+		logger.Warn("REDIS_URL not set, using in-memory cache")
 	}
 
 	httpClient := &http.Client{Timeout: 3 * time.Second}
@@ -59,7 +75,7 @@ func main() {
 		httpClient,
 	)
 
-	aggregator := services.NewAggregator(flightClient, weatherClient, redisCache, ttl)
+	aggregator := services.NewAggregator(flightClient, weatherClient, cache, ttl)
 	handler := handlers.NewFlightHandler(aggregator)
 
 	r := gin.New()
@@ -78,13 +94,17 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 	r.GET("/readyz", func(c *gin.Context) {
+		if !usingRedis {
+			c.JSON(http.StatusOK, gin.H{"status": "ready", "cache": "in-memory"})
+			return
+		}
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
 		defer cancel()
-		if err := redisCache.Ping(ctx); err != nil {
+		if err := cache.Ping(ctx); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+		c.JSON(http.StatusOK, gin.H{"status": "ready", "cache": "redis"})
 	})
 
 	srv := &http.Server{
