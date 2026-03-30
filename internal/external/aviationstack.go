@@ -32,23 +32,23 @@ func NewAviationStackClient(baseURL, apiKey string, client *http.Client) *Aviati
 type aviationStackResponse struct {
 	Data []struct {
 		Flight struct {
-			IATA string `json:"iata"`
+			IATA *string `json:"iata"`
 		} `json:"flight"`
 		Airline struct {
-			Name string `json:"name"`
+			Name *string `json:"name"`
 		} `json:"airline"`
 		Departure struct {
-			Airport   string `json:"airport"`
-			Scheduled string `json:"scheduled"`
-			Terminal  string `json:"terminal"`
-			Gate      string `json:"gate"`
+			Airport   *string `json:"airport"`
+			Scheduled *string `json:"scheduled"`
+			Terminal  *string `json:"terminal"`
+			Gate      *string `json:"gate"`
 		} `json:"departure"`
 		Arrival struct {
-			Airport   string `json:"airport"`
-			Estimated string `json:"estimated"`
-			Delay     int    `json:"delay"`
+			Airport   *string `json:"airport"`
+			Estimated *string `json:"estimated"`
+			Delay     *int    `json:"delay"`
 		} `json:"arrival"`
-		FlightStatus string `json:"flight_status"`
+		FlightStatus *string `json:"flight_status"`
 	} `json:"data"`
 }
 
@@ -87,19 +87,44 @@ func (a *AviationStackClient) Fetch(ctx context.Context, flightNumber string) (*
 	}
 
 	entry := decoded.Data[0]
-	scheduled, _ := time.Parse(time.RFC3339, entry.Departure.Scheduled)
-	estimated, _ := time.Parse(time.RFC3339, entry.Arrival.Estimated)
+	scheduled := parseRFC3339Ptr(entry.Departure.Scheduled)
+	estimated := parseRFC3339Ptr(entry.Arrival.Estimated)
 
 	return &domain.FlightDetails{
-		FlightNumber:   entry.Flight.IATA,
-		Airline:        entry.Airline.Name,
-		Departure:      entry.Departure.Airport,
-		Destination:    entry.Arrival.Airport,
+		FlightNumber:   valueOrEmpty(entry.Flight.IATA),
+		Airline:        valueOrEmpty(entry.Airline.Name),
+		Departure:      valueOrEmpty(entry.Departure.Airport),
+		Destination:    valueOrEmpty(entry.Arrival.Airport),
 		ScheduledTime:  scheduled,
 		EstimatedTime:  estimated,
-		Status:         entry.FlightStatus,
-		Terminal:       entry.Departure.Terminal,
-		Gate:           entry.Departure.Gate,
-		DelayInMinutes: entry.Arrival.Delay,
+		Status:         valueOrEmpty(entry.FlightStatus),
+		Terminal:       valueOrEmpty(entry.Departure.Terminal),
+		Gate:           valueOrEmpty(entry.Departure.Gate),
+		DelayInMinutes: valueOrZero(entry.Arrival.Delay),
 	}, nil
+}
+
+func valueOrEmpty(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
+}
+
+func valueOrZero(v *int) int {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
+func parseRFC3339Ptr(v *string) time.Time {
+	if v == nil || *v == "" {
+		return time.Time{}
+	}
+	parsed, err := time.Parse(time.RFC3339, *v)
+	if err != nil {
+		return time.Time{}
+	}
+	return parsed
 }

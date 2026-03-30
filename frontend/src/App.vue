@@ -154,7 +154,7 @@ const runCommand = async (rawCommand) => {
     await pushTypedLine("Available commands:");
     pushLine("- help                 Show this message");
     pushLine("- clear                Clear terminal output");
-    pushLine("- flight <number>      Fetch flight dashboard");
+    pushLine("- flight <IATA_CODE>   Fetch flight dashboard (e.g. LH123, OS752)");
     pushLine("- about                About this project");
     pushLine("- status               Local backend/terminal status");
     pushLine("- uptime               Show terminal uptime");
@@ -240,7 +240,7 @@ const runCommand = async (rawCommand) => {
   if (normalized === "flight") {
     if (!args[0]) {
       pushLine(`${promptText} ${raw}`, "cmd");
-      pushLine("[error] usage: flight <number>", "error");
+      pushLine("[error] usage: flight <IATA_CODE> (e.g. LH123, OS752)", "error");
       return;
     }
     await executeFlight(args[0]);

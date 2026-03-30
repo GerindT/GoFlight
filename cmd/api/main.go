@@ -37,15 +37,25 @@ func main() {
 	}
 
 	httpClient := &http.Client{Timeout: 3 * time.Second}
+	weatherLat, err := strconv.ParseFloat(env("OPENWEATHER_LAT", "50.1109"), 64)
+	if err != nil {
+		log.Fatalf("invalid OPENWEATHER_LAT: %v", err)
+	}
+	weatherLon, err := strconv.ParseFloat(env("OPENWEATHER_LON", "8.6821"), 64)
+	if err != nil {
+		log.Fatalf("invalid OPENWEATHER_LON: %v", err)
+	}
+
 	flightClient := external.NewAviationStackClient(
 		env("AVIATIONSTACK_BASE_URL", "http://api.aviationstack.com/v1"),
 		env("AVIATIONSTACK_API_KEY", ""),
 		httpClient,
 	)
 	weatherClient := external.NewOpenWeatherClient(
-		env("OPENWEATHER_BASE_URL", "https://api.openweathermap.org/data/2.5"),
-		env("OPENWEATHER_API_KEY", ""),
+		env("OPENWEATHER_BASE_URL", "https://api.open-meteo.com/v1"),
 		env("DEFAULT_WEATHER_CITY", "Frankfurt"),
+		weatherLat,
+		weatherLon,
 		httpClient,
 	)
 

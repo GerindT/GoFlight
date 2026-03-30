@@ -10,6 +10,18 @@ if [[ ! -f .env ]]; then
   cp .env.example .env
 fi
 
+# Export .env so backend/frontend processes inherit configuration.
+set -a
+source .env
+set +a
+
+if ss -ltn "( sport = :6379 )" | rg -q ":6379"; then
+  echo "Port 6379 is already in use."
+  echo "Stop the conflicting service (e.g. system Redis) and retry:"
+  echo "  sudo systemctl stop redis"
+  exit 1
+fi
+
 echo "Starting Redis via docker compose..."
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   docker compose up -d redis
