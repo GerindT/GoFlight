@@ -1,89 +1,82 @@
 # GoFlight
 
-GoFlight is a Go-based flight data aggregator with a terminal-style Vue frontend.  
-It combines flight status + weather data, adds resilience patterns (timeouts, circuit breakers, cache fallback), and exposes production-friendly health and metrics endpoints.
+A flight lookup dashboard: a Go API that combines flight status with current weather, behind a terminal-style Vue front end.
+
+**Live:** [go-flight.vercel.app](https://go-flight.vercel.app) (the terminal loads, but flight lookups currently fail because the AviationStack API key on the hosted backend is out of quota or no longer valid)
+
+![GoFlight: a terminal-style dashboard showing a flight lookup](docs/screenshot.webp)
 
 ## Features
 
-### Backend
+- `GET /api/v1/dashboard/:flight` returns flight status (AviationStack) and current weather (Open-Meteo) in one response
+- Both upstream calls run concurrently, each behind a circuit breaker (`sony/gobreaker`) with timeouts
+- Responses are cached in Redis; if Redis is not set or unreachable, an in-memory cache is used, and a stale entry is served when an upstream fails
+- JSON logs (`slog`) with request IDs, Prometheus metrics at `/metrics`, and `/healthz` and `/readyz` probes
+- Terminal UI with command history, aliases, tab completion and `&&` chaining. Commands: `help`, `flight <code>`, `about`, `status`, `uptime`, `neofetch`, `demo`, `boot`, `height <px>`, `clear`
 
-- `GET /api/v1/dashboard/:flight` aggregation endpoint
-- Cache-first reads with Redis + stale-cache fallback
-- Fan-out/fan-in concurrency for upstream calls
-- Circuit breakers via `sony/gobreaker`
-- Structured logs (`slog`) with request IDs
-- Metrics endpoint: `GET /metrics`
-- Health endpoints: `GET /healthz`, `GET /readyz`
+## Stack
 
-### Frontend (Terminal UI)
+- [Go](https://go.dev) 1.25 with [Gin](https://gin-gonic.com), Redis (`go-redis`), Prometheus client
+- [Vue 3](https://vuejs.org) with [Vite 5](https://vite.dev)
+- Docker and Docker Compose, plus Kubernetes manifests in `k8s/`
+- Front end hosted on [Vercel](https://vercel.com), API on [Render](https://render.com)
 
-- Shell-like typing experience (no classic form input)
-- Command history (`ArrowUp` / `ArrowDown`)
-- Command aliases (`h`, `cls`, `f`, `nf`, etc.)
-- Tab completion suggestions (shown in a bottom status line)
-- Multi-command chaining with `&&`
-- Built-in commands: `help`, `flight`, `status`, `uptime`, `neofetch`, `boot`, `height`, `clear`
+## Project structure
 
-## Tech Stack
+```
+GoFlight/
+├── cmd/api/              # server entry point, middleware, graceful shutdown
+├── internal/
+│   ├── services/         # aggregator: fan-out, circuit breakers, cache
+│   ├── external/         # AviationStack, Open-Meteo, Redis and memory cache clients
+│   ├── handlers/         # HTTP handlers (with tests)
+│   └── middleware/       # logging and metrics
+├── mock/                 # fake fetchers for tests
+├── frontend/             # terminal-style Vue app
+├── k8s/                  # namespace, configmap, secret, deployment, service, ingress, HPA
+└── scripts/              # dev-local.sh / stop-local.sh
+```
 
-- **Backend:** Go, Gin, Prometheus client, Redis, Gobreaker
-- **Frontend:** Vue 3 + Vite
-- **Dev tooling:** Air (backend hot reload), Docker Compose
+## Run locally
 
-## Project Layout
+Requires Go 1.25+ and Node.js. Redis is optional.
 
-- `cmd/api/main.go` - API startup, middleware, graceful shutdown
-- `internal/services/aggregator.go` - core aggregation and resilience
-- `internal/external/*.go` - upstream API + Redis clients
-- `internal/handlers/flight_handler.go` - HTTP handler layer
-- `internal/middleware/*.go` - logger + metrics middleware
-- `frontend/` - terminal-style Vue app
-- `scripts/dev-local.sh` - start local full stack
-- `scripts/stop-local.sh` - stop local processes
-- `k8s/*.yaml` - Kubernetes manifests
+```sh
+cp .env.example .env      # then fill in the values
+bash scripts/dev-local.sh # API on :8080 (hot reload with Air), front end on :5173
+bash scripts/stop-local.sh
+```
 
-## Quickstart (Local)
+Environment variables (see `.env.example`):
 
-1. Copy env template:
-   - `cp .env.example .env`
-2. Add your API keys in `.env`:
-   - `AVIATIONSTACK_API_KEY`
-   - `OPENWEATHER_API_KEY`
-3. Start full local stack:
-   - `bash scripts/dev-local.sh`
-4. Open:
-   - Frontend: `http://localhost:5173`
-   - API health: `http://localhost:8080/healthz`
-5. Stop:
-   - `bash scripts/stop-local.sh`
+| Name | Purpose |
+|------|---------|
+| `AVIATIONSTACK_API_KEY` | Required for flight lookups. Get a key at [aviationstack.com](https://aviationstack.com) |
+| `AVIATIONSTACK_BASE_URL` | Defaults to `http://api.aviationstack.com/v1` |
+| `OPENWEATHER_BASE_URL` | Weather API base, defaults to Open-Meteo (`https://api.open-meteo.com/v1`, no key needed) |
+| `OPENWEATHER_LAT`, `OPENWEATHER_LON`, `DEFAULT_WEATHER_CITY` | Location used for the weather panel (defaults to Frankfurt) |
+| `REDIS_URL` | Optional; falls back to an in-memory cache |
+| `CACHE_TTL` | Cache lifetime in seconds |
+| `PORT` | API port, default `8080` |
+| `FRONTEND_ORIGINS` | Comma-separated CORS origins |
+| `VITE_API_BASE` | API URL used by the front end, default `http://localhost:8080` |
 
-## Terminal Commands (Frontend)
+`OPENWEATHER_API_KEY` is listed in `.env.example` but is not read by the current code.
 
-- `help` - list commands
-- `flight LH123` - fetch flight dashboard
-- `status` - print local UI/API status
-- `uptime` - show session uptime
-- `neofetch` - print splash
-- `boot` - run boot animation
-- `height 620` - set terminal height
-- `clear` - clear terminal output
-- Command chaining:
-  - `neofetch && status && flight LH123`
+Tests and build:
 
-## Hot Reload
+```sh
+go test ./...
+npm --prefix frontend run build
+```
 
-- Frontend: Vite dev server
-- Backend: Air (auto-installed to `./.bin` by `scripts/dev-local.sh` if missing)
+Or run the API with Redis in Docker: `docker compose up --build`.
 
-## Verify
+## Deploy
 
-- Backend tests:
-  - `go test ./...`
-- Frontend build:
-  - `npm --prefix frontend run build`
+- **API:** the `Dockerfile` builds a static Go binary on Alpine. Deploy it to any container host and set the variables above. Kubernetes manifests are in `k8s/`; `k8s/secret.yaml` holds placeholders only.
+- **Front end:** build `frontend/` with `VITE_API_BASE` set to the API URL and serve `frontend/dist` from any static host.
 
-## Deployment Notes
+## License
 
-- Docker image and compose are included for local/runtime use.
-- Kubernetes manifests are in `k8s/` (namespace, configmap, secret, deployment, service, ingress, hpa).
-- `k8s/secret.yaml` uses demo placeholders; use proper secret management in production (Sealed Secrets, ESO, Vault, etc.).
+[MIT](LICENSE)
