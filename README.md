@@ -2,7 +2,7 @@
 
 A flight lookup dashboard: a Go API that combines flight status with current weather, behind a terminal-style Vue front end.
 
-**Status:** a side project built for fun; it runs locally (steps below) and is not hosted.
+**Status:** built for "a project a day", a challenge I set myself to build a small, complete app in a day. It isn't hosted; it runs locally (steps below).
 
 ![GoFlight: a terminal-style dashboard showing a flight lookup](docs/screenshot.webp)
 
