@@ -2,7 +2,7 @@
 
 A flight lookup dashboard: a Go API that combines flight status with current weather, behind a terminal-style Vue front end.
 
-**Live:** [go-flight.vercel.app](https://go-flight.vercel.app) (the terminal loads, but flight lookups currently fail because the AviationStack API key on the hosted backend is out of quota or no longer valid)
+**Live:** [goflight.gerind.dev](https://goflight.gerind.dev) (the terminal loads, but flight lookups currently fail because the AviationStack API key on the hosted backend is out of quota or no longer valid)
 
 ![GoFlight: a terminal-style dashboard showing a flight lookup](docs/screenshot.webp)
 
@@ -19,7 +19,7 @@ A flight lookup dashboard: a Go API that combines flight status with current wea
 - [Go](https://go.dev) 1.25 with [Gin](https://gin-gonic.com), Redis (`go-redis`), Prometheus client
 - [Vue 3](https://vuejs.org) with [Vite 5](https://vite.dev)
 - Docker and Docker Compose, plus Kubernetes manifests in `k8s/`
-- Front end hosted on [Vercel](https://vercel.com), API on [Render](https://render.com)
+- Front end hosted on [Cloudflare Workers](https://developers.cloudflare.com/workers/static-assets/) at goflight.gerind.dev, API on [Render](https://render.com)
 
 ## Project structure
 
@@ -75,7 +75,7 @@ Or run the API with Redis in Docker: `docker compose up --build`.
 ## Deploy
 
 - **API:** the `Dockerfile` builds a static Go binary on Alpine. Deploy it to any container host and set the variables above. Kubernetes manifests are in `k8s/`; `k8s/secret.yaml` holds placeholders only.
-- **Front end:** build `frontend/` with `VITE_API_BASE` set to the API URL and serve `frontend/dist` from any static host.
+- **Front end:** from `frontend/`, `npm run deploy` builds with `VITE_API_BASE` pointing at the Render API and uploads `dist/` to Cloudflare (config in `frontend/wrangler.jsonc`). The API must list `https://goflight.gerind.dev` in `FRONTEND_ORIGINS`.
 
 ## License
 
